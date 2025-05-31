@@ -8,7 +8,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
+use Laravel\Sanctum\HasApiTokens;
+
 
 class UserController extends Controller
 {
@@ -120,11 +121,11 @@ class UserController extends Controller
                 ]);
             }
 
-            $user->token = Str::uuid()->toString();
-            $user->save();
+            // Issue a Sanctum token instead of a custom UUID
+            $token = $user->createToken('FlightSyncToken')->plainTextToken;
 
             $data = [
-                'token' => $user->token,
+                'token' => $token,
                 'users' => [
                     'full_name' => $user->full_name,
                     'email' => $user->email,
@@ -191,7 +192,7 @@ class UserController extends Controller
             Log::info('User logged in successfully', [
                 'user_id' => $user->id,
                 'email' => $user->email,
-                'token' => $user->token,
+                'token' => $token,
             ]);
 
             return response()->json([

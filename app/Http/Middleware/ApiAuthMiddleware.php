@@ -20,13 +20,6 @@ class ApiAuthMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-
-
-        Log::debug('ApiAuthMiddleware triggered', [
-           $request->header('Authorization'),
-            
-        ]);
-
         $token = str_replace('Bearer ', '', $request->header('Authorization'));
         $authenticate = true;
 

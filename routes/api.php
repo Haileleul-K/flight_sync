@@ -69,7 +69,7 @@ Route::get('/flight_tags', [MasterController::class, "flightTags"]);
 
 
 // Protected routes
-Route::middleware([ApiAuthMiddleware::class])->group(function () {
+Route::middleware('auth:sanctum')->group(function () {
     Route::put('/profile', [UserController::class, 'updateProfile']); // Update user profile
     Route::get('/flights', [FlightController::class, 'list']); // Fetch all flights
     Route::post('/flights', [FlightController::class, 'store']);// Create a new flight
