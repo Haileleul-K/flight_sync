@@ -6,21 +6,27 @@ use App\Models\Flight;
 use App\Models\Simulator;
 use App\Models\AircraftSimulatorMin;
 use App\Models\PilotApacheSeatHour;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class ReportController extends Controller
 {
     public function careerReport(Request $request): JsonResponse
     {
-        $user = Auth::user();
+        $user = Auth::guard('sanctum')->user();
         if (!$user) {
+            Log::error('Unauthorized access attempt to careerReport');
             return response()->json([
                 'status' => 'error',
-                'message' => 'Unauthorized: User not authenticated',
+                'message' => 'Unauthenticated.',
             ], 401);
         }
+
+        Log::info('Fetching career report for user ID: ' . $user->id);
 
         // Determine aircraft_id from aircraft_simulator_min or fallback to PilotApacheSeatHour
         $minReq = AircraftSimulatorMin::where('user_id', $user->id)
@@ -340,6 +346,94 @@ class ReportController extends Controller
         return response()->json([
             'message' => 'Successfully retrieved career report.',
             'data' => $response
+        ], 200, [], JSON_PRETTY_PRINT);
+    }
+
+    public function dashboardReport(Request $request): JsonResponse
+    {
+        $user = Auth::guard('sanctum')->user();
+        if (!$user) {
+            Log::error('Unauthorized access attempt to dashboardReport');
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+
+        Log::info('Fetching dashboard report for user ID: ' . $user->id);
+
+        // Total registered users
+        $totalUsers = User::count();
+
+        // Calculate subscribed users for current and previous month
+        $currentMonth = Carbon::now()->startOfMonth();
+        $previousMonth = Carbon::now()->subMonth()->startOfMonth();
+
+        $currentMonthUsers = User::where('created_at', '>=', $currentMonth)
+            ->where('created_at', '<', $currentMonth->copy()->endOfMonth())
+            ->count();
+
+        $previousMonthUsers = User::where('created_at', '>=', $previousMonth)
+            ->where('created_at', '<', $previousMonth->copy()->endOfMonth())
+            ->count();
+
+        $percentIncrease = $previousMonthUsers > 0
+            ? (($currentMonthUsers - $previousMonthUsers) / $previousMonthUsers) * 100
+            : ($currentMonthUsers > 0 ? 100 : 0);
+
+        // Total flights logged
+        $totalFlights = Flight::where('user_id', $user->id)->count();
+
+        // Total aircraft hours
+        $flightTotals = Flight::where('user_id', $user->id)->selectRaw('
+            COALESCE(SUM(day), 0) as day,
+            COALESCE(SUM(night), 0) as night,
+            COALESCE(SUM(nvs), 0) as nvs,
+            COALESCE(SUM(hood), 0) as hood,
+            COALESCE(SUM(weather), 0) as weather,
+            COALESCE(SUM(nvg), 0) as nvg
+        ')->first()->toArray();
+
+        $totalAircraftHours = array_sum([
+            (float) $flightTotals['day'],
+            (float) $flightTotals['night'],
+            (float) $flightTotals['nvs'],
+            (float) $flightTotals['hood'],
+            (float) $flightTotals['weather'],
+            (float) $flightTotals['nvg']
+        ]);
+
+        // Total simulator hours
+        $simulatorTotals = Simulator::where('user_id', $user->id)->selectRaw('
+            COALESCE(SUM(day), 0) as day,
+            COALESCE(SUM(night), 0) as night,
+            COALESCE(SUM(nvs), 0) as nvs,
+            COALESCE(SUM(hood), 0) as hood,
+            COALESCE(SUM(weather), 0) as weather,
+            COALESCE(SUM(nvg), 0) as nvg
+        ')->first()->toArray();
+
+        $totalSimulatorHours = array_sum([
+            (float) $simulatorTotals['day'],
+            (float) $simulatorTotals['night'],
+            (float) $simulatorTotals['nvs'],
+            (float) $simulatorTotals['hood'],
+            (float) $simulatorTotals['weather'],
+            (float) $simulatorTotals['nvg']
+        ]);
+
+        $response = [
+            'total_users' => $totalUsers,
+            'subscribed_users_increase_percent' => number_format($percentIncrease, 2) . '%',
+            'total_flights_logged' => $totalFlights,
+            'total_aircraft_hours' => number_format($totalAircraftHours, 1, '.', ''),
+            'total_simulator_hours' => number_format($totalSimulatorHours, 1, '.', ''),
+        ];
+
+        return response()->json([
+            'message' => 'Successfully retrieved dashboard report.',
+            'data' => $response,
+            'generated_at' => date('Y-m-d H:i:s')
         ], 200, [], JSON_PRETTY_PRINT);
     }
 }

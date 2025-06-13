@@ -110,7 +110,7 @@ class FlightController extends Controller
         }
 
         Log::debug("user id and flight user id", [$flight->user_id, $user->id]);
-        if ($flight->user_id !== $user->id) {
+        if ($flight->user_id != $user->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 

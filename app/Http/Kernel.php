@@ -23,9 +23,19 @@ class Kernel extends HttpKernel
         'api' => [
             'throttle:api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+            \App\Http\Middleware\ApiAuthMiddleware::class, // Add your custom middleware
             'force.json',
         ],
     ];
+    // protected $middlewareGroups = [
+    //     'api' => [
+    //         'throttle:api',
+    //         \Illuminate\Routing\Middleware\SubstituteBindings::class,
+    //         \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+    //         \App\Http\Middleware\ApiAuthMiddleware::class, // Add your custom middleware
+    //     ],
+    // ];
 
     protected $middlewareAliases = [
         'auth' => \App\Http\Middleware\Authenticate::class,
