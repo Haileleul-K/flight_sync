@@ -68,6 +68,8 @@ Route::post('/simulator-tags', [SimulatorTagController::class, 'store']); // Cre
 Route::get('/lookups', [LookupController::class, 'index']);
 
 Route::post('/login', [UserController::class, "login"]);
+Route::post('/admin-login', [UserController::class, "adminLogin"]);
+
 Route::post('/register', [UserController::class, "register"]);
 
 Route::get('/ranks', [MasterController::class, "ranks"]);
@@ -95,6 +97,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/pilot-semi-annual-periods', [PilotSemiAnnualPeriodController::class, 'update']);
 
     Route::get('/reports', [ReportController::class, 'careerReport']);
+    Route::get('/dashboard-report', [ReportController::class, 'dashboardReport']);
 
 
     Route::get('/simulators', [SimulatorController::class, 'list']);
