@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Auth;
 use App\Http\Requests\StoreFlightRequest;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
 
 class FlightController extends Controller
 {
@@ -99,6 +100,86 @@ class FlightController extends Controller
         ], 201);
     }
 
+    public function storeMultiple(Request $request): JsonResponse
+    {
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized: User not authenticated',
+            ], 401);
+        }
+
+        $flightsData = $request->input('flights', []);
+
+        if (!is_array($flightsData) || empty($flightsData)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'No flight data provided or invalid format',
+            ], 400);
+        }
+
+        // Validate each flight against StoreFlightRequest rules
+        $validator = Validator::make(['flights' => $flightsData], [
+            'flights' => 'required|array',
+            'flights.*' => ['required', 'array'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $validator->errors()->first(),
+            ], 422);
+        }
+
+        // Custom validation for each flight using StoreFlightRequest logic
+        $validatedFlights = [];
+        foreach ($flightsData as $index => $flightData) {
+            $flightValidator = Validator::make($flightData, (new StoreFlightRequest())->rules());
+            if ($flightValidator->fails()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "Validation failed for flight at index $index: " . $flightValidator->errors()->first(),
+                ], 422);
+            }
+            $validatedFlights[] = array_merge($flightData, ['user_id' => $user->id]);
+        }
+
+        $createdFlights = [];
+
+        try {
+            DB::beginTransaction();
+
+            foreach ($validatedFlights as $flightData) {
+                // Convert string numbers to float/int where applicable
+                $flightData = array_map(function ($value) {
+                    if (is_numeric($value)) {
+                        return is_float($value + 0) ? (float)$value : (int)$value;
+                    }
+                    return $value;
+                }, $flightData);
+
+                $flight = Flight::create($flightData);
+                $flight->load(['dutyPosition', 'mission', 'aircraftModel']);
+                $createdFlights[] = $this->formatFlight($flight);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Flights created successfully.',
+                'data' => $createdFlights
+            ], 201);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Failed to create multiple flights', ['error' => $e->getMessage(), 'data' => $flightsData]);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to create flights',
+            ], 500);
+        }
+    }
+
     public function show(Flight $flight): JsonResponse
     {
         $user = Auth::user();
@@ -132,7 +213,7 @@ class FlightController extends Controller
             ], 401);
         }
 
-        if ($flight->user_id !== $user->id) {
+        if ($flight->user_id != $user->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -155,7 +236,7 @@ class FlightController extends Controller
             ], 401);
         }
 
-        if ($flight->user_id !== $user->id) {
+        if ($flight->user_id != $user->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 

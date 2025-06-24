@@ -85,6 +85,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/profile', [UserController::class, 'updateProfile']); // Update user profile
     Route::get('/flights', [FlightController::class, 'list']); // Fetch all flights
     Route::post('/flights', [FlightController::class, 'store']);// Create a new flight
+    Route::post('/flights/multiple', [FlightController::class, 'storeMultiple']);// Create multiple flights
     Route::get('/flights/{flight}', [FlightController::class, 'show']); // Fetch a specific flight
     Route::put('/flights/{flight}', [FlightController::class, 'update']);// Update a specific flight
     Route::get('/pilot-apache-seat-hours', [PilotApacheSeatHourController::class, 'show']); // Fetch pilot Apache seat hours

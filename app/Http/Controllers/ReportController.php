@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class ReportController extends Controller
 {
@@ -28,19 +29,27 @@ class ReportController extends Controller
 
         Log::info('Fetching career report for user ID: ' . $user->id);
 
-        // Determine aircraft_id from aircraft_simulator_min or fallback to PilotApacheSeatHour
-        $minReq = AircraftSimulatorMin::where('user_id', $user->id)
-            ->select(['aircraft_id'])
-            ->first();
+        // Determine aircraft_models_id from flights table (use the most frequent or latest)
+        $flightQuery = Flight::where('user_id', $user->id);
+        $aircraftModelsIds = $flightQuery->pluck('aircraft_models_id')->toArray();
 
-        $apacheReq = PilotApacheSeatHour::where('user_id', $user->id)
-            ->select(['aircraft_id'])
-            ->first();
+        $aircraftId = null;
+        if (!empty($aircraftModelsIds)) {
+            // Use the most frequent aircraft_models_id (mode)
+            $aircraftId = array_search(max(array_count_values($aircraftModelsIds)), array_count_values($aircraftModelsIds));
+            Log::debug('Determined aircraft_models_id (most frequent): ' . $aircraftId);
+        } else {
+            Log::warning('No flights found for user, aircraft_models_id will be null.');
+        }
 
-        $aircraftId = $minReq ? $minReq->aircraft_id : ($apacheReq ? $apacheReq->aircraft_id : null);
+        // If no frequent ID or no flights, use the latest aircraft_models_id as a fallback
+        if (!$aircraftId && $flightQuery->exists()) {
+            $latestFlight = $flightQuery->latest('date')->first();
+            $aircraftId = $latestFlight ? $latestFlight->aircraft_models_id : null;
+            Log::debug('Fallback to latest aircraft_models_id: ' . $aircraftId);
+        }
 
         // Flight report
-        $flightQuery = Flight::where('user_id', $user->id)->with(['dutyPosition', 'mission']);
         $flightStartDate = $flightQuery->min('date');
         $flightEndDate = $flightQuery->max('date');
 
@@ -63,39 +72,79 @@ class ReportController extends Controller
             (float) $flightCareerTotals['nvg']
         ]);
 
-        // Duty totals filtered by aircraft_id
-        $flightDutyTotals = $aircraftId
-            ? Flight::where('user_id', $user->id)
+        // Duty totals (aggregate by duty_positions.code, joined via duty_position_id)
+        $flightDutyTotals = [];
+        if ($aircraftId) {
+            $dutyTotalsQuery = Flight::where('user_id', $user->id)
                 ->where('aircraft_models_id', $aircraftId)
                 ->leftJoin('duty_positions', 'flights.duty_position_id', '=', 'duty_positions.id')
                 ->groupBy('duty_positions.code')
                 ->selectRaw('
                     duty_positions.code,
                     COALESCE(SUM(flights.day + flights.night + flights.nvs + flights.hood + flights.weather + flights.nvg), 0) as total
-                ')
-                ->pluck('total', 'code')
+                ');
+            $dutyTotals = $dutyTotalsQuery->get();
+            Log::debug('Duty totals query result: ', $dutyTotals->toArray());
+            $flightDutyTotals = $dutyTotals->pluck('total', 'code')
                 ->mapWithKeys(function ($value, $key) {
                     return [$key => number_format((float) $value, 1, '.', '')];
                 })
-                ->toArray()
-            : (object) [];
+                ->toArray();
+        } else {
+            // If no aircraft_id, aggregate all flights' duty totals
+            $dutyTotalsQuery = Flight::where('user_id', $user->id)
+                ->leftJoin('duty_positions', 'flights.duty_position_id', '=', 'duty_positions.id')
+                ->groupBy('duty_positions.code')
+                ->selectRaw('
+                    duty_positions.code,
+                    COALESCE(SUM(flights.day + flights.night + flights.nvs + flights.hood + flights.weather + flights.nvg), 0) as total
+                ');
+            $dutyTotals = $dutyTotalsQuery->get();
+            Log::debug('Duty totals query result (no aircraft_id): ', $dutyTotals->toArray());
+            $flightDutyTotals = $dutyTotals->pluck('total', 'code')
+                ->mapWithKeys(function ($value, $key) {
+                    return [$key => number_format((float) $value, 1, '.', '')];
+                })
+                ->toArray();
+            Log::warning('No valid aircraft_models_id found, using all flights for duty totals.');
+        }
 
-        // Mission totals filtered by aircraft_id
-        $flightMissionTotals = $aircraftId
-            ? Flight::where('user_id', $user->id)
+        // Mission totals (aggregate by missions.code, joined via mission_id)
+        $flightMissionTotals = [];
+        if ($aircraftId) {
+            $missionTotalsQuery = Flight::where('user_id', $user->id)
                 ->where('aircraft_models_id', $aircraftId)
                 ->leftJoin('missions', 'flights.mission_id', '=', 'missions.id')
                 ->groupBy('missions.code')
                 ->selectRaw('
                     missions.code,
                     COALESCE(SUM(flights.day + flights.night + flights.nvs + flights.hood + flights.weather + flights.nvg), 0) as total
-                ')
-                ->pluck('total', 'code')
+                ');
+            $missionTotals = $missionTotalsQuery->get();
+            Log::debug('Mission totals query result: ', $missionTotals->toArray());
+            $flightMissionTotals = $missionTotals->pluck('total', 'code')
                 ->mapWithKeys(function ($value, $key) {
                     return [$key => number_format((float) $value, 1, '.', '')];
                 })
-                ->toArray()
-            : (object) [];
+                ->toArray();
+        } else {
+            // If no aircraft_id, aggregate all flights' mission totals
+            $missionTotalsQuery = Flight::where('user_id', $user->id)
+                ->leftJoin('missions', 'flights.mission_id', '=', 'missions.id')
+                ->groupBy('missions.code')
+                ->selectRaw('
+                    missions.code,
+                    COALESCE(SUM(flights.day + flights.night + flights.nvs + flights.hood + flights.weather + flights.nvg), 0) as total
+                ');
+            $missionTotals = $missionTotalsQuery->get();
+            Log::debug('Mission totals query result (no aircraft_id): ', $missionTotals->toArray());
+            $flightMissionTotals = $missionTotals->pluck('total', 'code')
+                ->mapWithKeys(function ($value, $key) {
+                    return [$key => number_format((float) $value, 1, '.', '')];
+                })
+                ->toArray();
+            Log::warning('No valid aircraft_models_id found, using all flights for mission totals.');
+        }
 
         // Simulator report
         $simulatorQuery = Simulator::where('user_id', $user->id);
@@ -321,7 +370,7 @@ class ReportController extends Controller
                     'weather' => (float) $flightCareerTotals['weather'],
                     'nvg' => (float) $flightCareerTotals['nvg'],
                 ],
-                'total_flight_hour' => number_format($flightTotalFlightHour, 1, '.', ''), // Moved total_flight_hour here
+                'total_flight_hour' => number_format($flightTotalFlightHour, 1, '.', ''),
                 'dutyTotals' => $flightDutyTotals,
                 'missionTotals' => $flightMissionTotals,
             ],
@@ -334,7 +383,7 @@ class ReportController extends Controller
                     'weather' => (int) $simulatorCareerTotals['weather'],
                     'nvg' => (int) $simulatorCareerTotals['nvg'],
                 ],
-                'total_flight_hour' => number_format($simulatorTotalFlightHour, 1, '.', ''), // Moved total_flight_hour here
+                'total_flight_hour' => number_format($simulatorTotalFlightHour, 1, '.', ''),
                 'dutyTotals' => $simulatorDutyTotals ?: (object) [],
             ],
             'semiAnnualReport' => [
@@ -382,10 +431,10 @@ class ReportController extends Controller
             : ($currentMonthUsers > 0 ? 100 : 0);
 
         // Total flights logged
-        $totalFlights = Flight::where('user_id', $user->id)->count();
+        $totalFlights = Flight::count();
 
         // Total aircraft hours
-        $flightTotals = Flight::where('user_id', $user->id)->selectRaw('
+        $flightTotals = Flight::selectRaw('
             COALESCE(SUM(day), 0) as day,
             COALESCE(SUM(night), 0) as night,
             COALESCE(SUM(nvs), 0) as nvs,
@@ -404,7 +453,7 @@ class ReportController extends Controller
         ]);
 
         // Total simulator hours
-        $simulatorTotals = Simulator::where('user_id', $user->id)->selectRaw('
+        $simulatorTotals = Simulator::selectRaw('
             COALESCE(SUM(day), 0) as day,
             COALESCE(SUM(night), 0) as night,
             COALESCE(SUM(nvs), 0) as nvs,
@@ -422,12 +471,26 @@ class ReportController extends Controller
             (float) $simulatorTotals['nvg']
         ]);
 
+        // Aircraft usage by model
+        $aircraftModels = DB::table('aircraft_models')->select('id', 'model')->get();
+        $flightHours = Flight::select('aircraft_models_id', DB::raw('COALESCE(SUM(day + night + nvs + hood + weather + nvg), 0) as total_hours'))
+            ->groupBy('aircraft_models_id')
+            ->pluck('total_hours', 'aircraft_models_id')
+            ->toArray();
+
+        $aircraftUsage = [];
+        foreach ($aircraftModels as $model) {
+            $totalHours = isset($flightHours[$model->id]) ? (float) $flightHours[$model->id] : 0.0;
+            $aircraftUsage[$model->model] = ['hours' => number_format($totalHours, 1, '.', '')];
+        }
+
         $response = [
             'total_users' => $totalUsers,
             'subscribed_users_increase_percent' => number_format($percentIncrease, 2) . '%',
             'total_flights_logged' => $totalFlights,
             'total_aircraft_hours' => number_format($totalAircraftHours, 1, '.', ''),
             'total_simulator_hours' => number_format($totalSimulatorHours, 1, '.', ''),
+           'AircraftUsage' => $aircraftUsage,
         ];
 
         return response()->json([

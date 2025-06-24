@@ -3,34 +3,45 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Auth;
 
 class StoreFlightRequest extends FormRequest
 {
     public function authorize()
     {
-        return true;
+        return Auth::check();
     }
 
     public function rules()
     {
         return [
-            'day' => 'nullable|integer|min:0',
-            'night' => 'nullable|integer|min:0',
-            'nvs' => 'nullable|integer|min:0',
-            'hood' => 'nullable|integer|min:0',
-            'weather' => 'nullable|integer|min:0',
-            'nvg' => 'nullable|integer|min:0',
-            'date' => 'nullable|date',
-            'image' => 'nullable|string|max:255',
-            'duty_position_id' => 'nullable|exists:duty_positions,id',
-            'mission_id' => 'nullable|exists:missions,id',
-            'aircraft_models_id' => 'nullable|exists:aircraft_models,id',
+            'day' => 'required|numeric', // Changed from integer to numeric
+            'night' => 'required|numeric', // Changed from integer to numeric
+            'nvs' => 'required|numeric', // Changed from integer to numeric
+            'hood' => 'required|numeric', // Changed from integer to numeric
+            'weather' => 'required|numeric', // No change
+            'nvg' => 'required|numeric', // Changed from integer to numeric
+            'date' => 'required|date',
+            'image' => 'nullable|string',
+            'duty_position_id' => 'required|exists:duty_positions,id',
+            'mission_id' => 'required|exists:missions,id',
+            'aircraft_models_id' => 'required|exists:aircraft_models,id',
             'seat' => 'nullable|string|max:50',
-            'tail_number' => 'nullable|string|max:50',
-            'departure_airport' => 'nullable|string|max:10',
-            'arrival_airport' => 'nullable|string|max:10',
-            'tags' => 'nullable|string|max:255',
-            'notes' => 'nullable|string|max:255',
+            'tail_number' => 'nullable|string|max:10',
+            'departure_airport' => 'nullable|string|max:4',
+            'arrival_airport' => 'nullable|string|max:4',
+            'tags' => 'nullable|array',
+            'notes' => 'nullable|string',
+        ];
+    }
+
+    public function messages()
+    {
+        return [
+            'weather.in' => 'The weather must be one of: VFR, IFR, MVFR.',
+            'seat.in' => 'The seat must be one of: left, right, back seat.',
         ];
     }
 }
+
+
