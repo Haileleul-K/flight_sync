@@ -34,6 +34,7 @@ class Flight extends Model
         'date' => 'date',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'tags' => 'array', // Ensure tags is cast as an array if stored as JSON
     ];
 
     public function user()

@@ -8,7 +8,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
+use Laravel\Sanctum\HasApiTokens;
+
 
 class UserController extends Controller
 {
@@ -120,11 +121,11 @@ class UserController extends Controller
                 ]);
             }
 
-            $user->token = Str::uuid()->toString();
-            $user->save();
+            // Issue a Sanctum token instead of a custom UUID
+            $token = $user->createToken('FlightSyncToken')->plainTextToken;
 
             $data = [
-                'token' => $user->token,
+                'token' => $token,
                 'users' => [
                     'full_name' => $user->full_name,
                     'email' => $user->email,
@@ -191,7 +192,7 @@ class UserController extends Controller
             Log::info('User logged in successfully', [
                 'user_id' => $user->id,
                 'email' => $user->email,
-                'token' => $user->token,
+                'token' => $token,
             ]);
 
             return response()->json([
@@ -218,6 +219,98 @@ class UserController extends Controller
             ]);
         }
     }
+
+
+
+
+    public function adminLogin(Request $request): JsonResponse
+{
+    try {
+        Log::debug('Admin login request received', [
+            'input' => $request->all(),
+            'headers' => $request->headers->all(),
+        ]);
+
+        // Validate input
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|string|email|max:100',
+            'password' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            Log::warning('Admin login validation failed', ['errors' => $validator->errors()]);
+            return response()->json([
+                'status' => 'error',
+                'message' => $validator->errors()->first(),
+            ], 422);
+        }
+
+        // Find user
+        $user = User::where('email', $request->email)->first();
+
+        // Check if user exists
+        if (!$user) {
+            Log::warning('Admin login failed: User not found', ['email' => $request->email]);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'User not registered',
+            ], 401);
+        }
+
+        // Verify password
+        if (!Hash::check($request->password, $user->password)) {
+            Log::warning('Admin login failed: Incorrect password', ['email' => $request->email]);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Incorrect password',
+            ], 401);
+        }
+
+        // Check if user is admin
+        if (!$user->is_admin) {
+            Log::warning('Admin login failed: User is not admin', ['user_id' => $user->id]);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Access denied: Administrator privileges required',
+            ], 403);
+        }
+
+        // Issue a Sanctum token
+        $token = $user->createToken('FlightSyncAdminToken')->plainTextToken;
+
+        // Prepare response data
+        $responseData = [
+            'token' => $token,
+            'is_admin' => $user->is_admin,
+            'user' => [
+                'id' => $user->id,
+                'full_name' => $user->full_name,
+                'email' => $user->email
+            ]
+        ];
+
+        Log::info('Admin logged in successfully', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Admin login successful',
+            'data' => $responseData,
+        ], 200);
+
+    } catch (\Exception $e) {
+        Log::error('Admin login failed', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Failed to login: ' . $e->getMessage(),
+        ], 500);
+    }
+}
 
     public function profile(Request $request): JsonResponse
     {
