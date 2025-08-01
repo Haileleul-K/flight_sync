@@ -16,16 +16,19 @@ class DatabaseSeeder extends Seeder
         // User::factory(10)->create();
 
         $this->call([
-           //AircraftModelSeeder::class,
-            ////FacLevelSeeder::class,
+          
+          // AircraftModelSeeder::class,
+          // FacLevelSeeder::class,
           // RankSeeder::class,
           // DutyPositionSeeder::class,
-          // MissionSeeder::class,
-          // FlightTagSeeder::class,
           // SimulatorTagSeeder::class,
-          // UserSeeder::class,
-          // SimulatorSeeder::class,
-          FlightSeeder::class,
+          
+
+            UserSeeder::class,
+            MissionSeeder::class,
+           FlightTagSeeder::class,
+            SimulatorSeeder::class,
+          //FlightSeeder::class,
         ]);
     }
 }
