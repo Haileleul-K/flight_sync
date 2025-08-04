@@ -14,16 +14,16 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Set working directory
 WORKDIR /var/www/html
 
-# Add non-root user
-RUN useradd -ms /bin/bash www-data || true
-USER www-data
+# Copy application files with correct ownership
+COPY --chown=www-data:www-data . .
 
-# Copy application files
-COPY . .
-
-# Set permissions
+# Set permissions as root
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html/storage /var/www/html/bootstrap/cache
+
+# Switch to non-root user
+RUN useradd -ms /bin/bash www-data || true
+USER www-data
 
 # Install Laravel dependencies
 RUN composer install --no-dev --optimize-autoloader \
