@@ -3,7 +3,8 @@
   "framework": null,
   "functions": {
     "api/index.php": {
-      "runtime": "vercel-php@0.6.0"
+      "runtime": "vercel-php@0.6.0",
+      "extensions": ["mysql", "pdo_mysql"]
     }
   },
   "routes": [
@@ -15,7 +16,7 @@
   "env": {
     "APP_ENV": "production",
     "APP_DEBUG": "false",
-    "APP_URL": "https://your-project-name.vercel.app",
+    "APP_URL": "https://flight-sync-haileleul-k.vercel.app",
     "APP_CONFIG_CACHE": "/tmp/config.php",
     "APP_EVENTS_CACHE": "/tmp/events.php",
     "APP_PACKAGES_CACHE": "/tmp/packages.php",
@@ -25,5 +26,14 @@
     "CACHE_DRIVER": "array",
     "LOG_CHANNEL": "stderr",
     "SESSION_DRIVER": "cookie"
-  }
+  },
+  "builds": [
+    {
+      "src": "api/index.php",
+      "use": "vercel-php@0.6.0",
+      "config": {
+        "command": "composer install --no-dev --optimize-autoloader"
+      }
+    }
+  ]
 }
