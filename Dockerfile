@@ -22,7 +22,6 @@ RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html/storage /var/www/html/bootstrap/cache
 
 # Switch to non-root user
-RUN useradd -ms /bin/bash www-data || true
 USER www-data
 
 # Install Laravel dependencies
