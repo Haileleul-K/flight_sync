@@ -3,8 +3,7 @@
   "framework": null,
   "functions": {
     "api/index.php": {
-      "runtime": "vercel-php@0.6.0",
-      "extensions": ["mysql", "pdo_mysql"]
+      "runtime": "vercel-php@latest"
     }
   },
   "routes": [
@@ -30,9 +29,9 @@
   "builds": [
     {
       "src": "api/index.php",
-      "use": "vercel-php@0.6.0",
+      "use": "vercel-php@latest",
       "config": {
-        "command": "composer install --no-dev --optimize-autoloader"
+        "command": "php -r \"copy('https://getcomposer.org/installer', 'composer-setup.php');\" && php composer-setup.php && php -r \"unlink('composer-setup.php');\" && php composer.phar install --no-dev --optimize-autoloader"
       }
     }
   ]
