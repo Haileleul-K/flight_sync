@@ -3,8 +3,7 @@
   "framework": null,
   "functions": {
     "api/index.php": {
-      "runtime": "vercel-php@latest",
-      "extensions": ["mysql", "pdo_mysql"]
+      "runtime": "vercel-php@latest"
     }
   },
   "routes": [
@@ -16,7 +15,7 @@
   "env": {
     "APP_ENV": "production",
     "APP_DEBUG": "false",
-    "APP_URL": "https://flight-sync-ten.vercel.app",
+    "APP_URL": "https://flight-sync-haileleul-k.vercel.app",
     "APP_CONFIG_CACHE": "/tmp/config.php",
     "APP_EVENTS_CACHE": "/tmp/events.php",
     "APP_PACKAGES_CACHE": "/tmp/packages.php",
@@ -32,7 +31,7 @@
       "src": "api/index.php",
       "use": "vercel-php@latest",
       "config": {
-        "command": "composer install --no-dev --optimize-autoloader"
+        "command": "php -r \"copy('https://getcomposer.org/installer', 'composer-setup.php');\" && php composer-setup.php && php -r \"unlink('composer-setup.php');\" && php composer.phar install --no-dev --optimize-autoloader"
       }
     }
   ]
