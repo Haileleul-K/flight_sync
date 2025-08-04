@@ -1,25 +1,7 @@
-FROM php:8.3-fpm
-
-RUN apt-get update && apt-get install -y \
-    git curl zip unzip libpng-dev libonig-dev libxml2-dev libzip-dev \
-    && docker-php-ext-install pdo_mysql mbstring zip exif pcntl bcmath gd
-
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-
-
-COPY . .
-
-RUN composer install --no-dev --optimize-autoloader
-
-
-# Use official PHP image with Apache
-FROM php:8.2-apache
+FROM php:8.3-apache
 
 # Enable Apache mod_rewrite
 RUN a2enmod rewrite
-
-# Set working directory
-WORKDIR /var/www/html
 
 # Install system dependencies & PHP extensions
 RUN apt-get update && apt-get install -y \
@@ -29,7 +11,14 @@ RUN apt-get update && apt-get install -y \
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Copy everything into container
+# Set working directory
+WORKDIR /var/www/html
+
+# Add non-root user
+RUN useradd -ms /bin/bash www-data || true
+USER www-data
+
+# Copy application files
 COPY . .
 
 # Set permissions
@@ -46,4 +35,3 @@ EXPOSE 80
 
 # Start Apache server
 CMD ["apache2-foreground"]
-    
