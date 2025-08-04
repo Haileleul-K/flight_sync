@@ -50,4 +50,4 @@ RUN php artisan config:clear \
 EXPOSE 80
 
 # Run migrations and start Apache
-CMD php artisan migrate --force && apache2-foreground
+# CMD php artisan migrate --force && apache2-foreground
