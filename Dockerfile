@@ -6,7 +6,7 @@ RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
 
 # Install system dependencies and PHP extensions for PostgreSQL
 RUN apt-get update && apt-get install -y \
-    git curl zip unzip libpng-dev libonig-dev libxml2-dev libzip-dev \
+    git curl zip unzip libpng-dev libonig-dev libxml2-dev libzip-dev libpq-dev \
     && docker-php-ext-install pdo_pgsql mbstring zip exif pcntl bcmath gd
 
 # Install Composer
@@ -48,3 +48,4 @@ RUN php artisan config:clear \
     && php artisan view:cache
 
 EXPOSE 80
+
