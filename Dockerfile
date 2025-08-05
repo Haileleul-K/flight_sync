@@ -4,10 +4,10 @@ FROM php:8.3-apache
 RUN a2enmod rewrite
 RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
 
-# Install system dependencies and PHP extensions
+# Install system dependencies and PHP extensions for PostgreSQL
 RUN apt-get update && apt-get install -y \
     git curl zip unzip libpng-dev libonig-dev libxml2-dev libzip-dev \
-    && docker-php-ext-install pdo_mysql mbstring zip exif pcntl bcmath gd
+    && docker-php-ext-install pdo_pgsql mbstring zip exif pcntl bcmath gd
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -48,6 +48,3 @@ RUN php artisan config:clear \
     && php artisan view:cache
 
 EXPOSE 80
-
-# Run migrations and start Apache
-# CMD php artisan migrate --force && apache2-foreground
