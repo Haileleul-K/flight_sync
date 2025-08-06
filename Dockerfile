@@ -1,29 +1,25 @@
 FROM php:8.3-apache
 
-# Enable Apache mod_rewrite and set ServerName
 RUN a2enmod rewrite
 RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
 
-# Install system dependencies and PHP extensions for PostgreSQL
 RUN apt-get update && apt-get install -y \
     git curl zip unzip libpng-dev libonig-dev libxml2-dev libzip-dev libpq-dev \
     && docker-php-ext-install pdo_pgsql mbstring zip exif pcntl bcmath gd
 
-# Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Set working directory
 WORKDIR /var/www/html
 
-# Copy application files with correct ownership
 COPY --chown=www-data:www-data . .
 
-# Set permissions and ensure ca.pem is readable
 RUN chown -R www-data:www-data /var/www/html /var/www/html/storage /var/www/html/bootstrap/cache \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache \
+    && mkdir -p /var/www/html/storage/framework/views \
+    && chown -R www-data:www-data /var/www/html/storage/framework/views \
+    && chmod -R 775 /var/www/html/storage/framework/views \
     && [ -f /var/www/html/ca.pem ] && chown www-data:www-data /var/www/html/ca.pem && chmod 644 /var/www/html/ca.pem || true
 
-# Configure Apache document root and rewrite rules
 RUN echo "<VirtualHost *:80>\n\
     ServerAdmin webmaster@localhost\n\
     DocumentRoot /var/www/html/public\n\
@@ -36,16 +32,17 @@ RUN echo "<VirtualHost *:80>\n\
     CustomLog \${APACHE_LOG_DIR}/access.log combined\n\
 </VirtualHost>" > /etc/apache2/sites-available/000-default.conf
 
-# Install Composer dependencies
 RUN composer install --no-dev --optimize-autoloader
 
-# Switch to non-root user
 USER www-data
 
-# Run Laravel commands
+# Copy .env file if it exists, otherwise use .env.example
+COPY --chown=www-data:www-data .env* ./
+
 RUN php artisan config:clear \
     && php artisan config:cache \
     && php artisan view:cache
 
 EXPOSE 80
 
+CMD php artisan migrate --force && apache2-foreground
