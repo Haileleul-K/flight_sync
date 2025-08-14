@@ -53,8 +53,4 @@ RUN php artisan config:clear \
 EXPOSE 80
 
 CMD /wait-for-it.sh $DB_HOST:5432 --timeout=60 -- \
-    php artisan config:clear && \
-    php artisan config:cache && \
-    php artisan view:cache && \
-    php artisan migrate --force --verbose && \
     apache2-foreground
